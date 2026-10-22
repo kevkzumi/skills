@@ -20,6 +20,8 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     begin = commands.add_parser("begin", help="Capture the baseline before editing")
     begin.add_argument("--repo", required=True)
+    begin.add_argument("--baseline", help="Ancestor commit covering the complete implementation")
+    begin.add_argument("--path", dest="paths", action="append", help="Owned repository-relative file or directory; repeat as needed")
     begin.add_argument("--author", choices=["codex", "claude"])
     begin.add_argument("--reviewer-model", help="Requested model for the opposite reviewer tool")
     review = commands.add_parser("review", help="Run a frozen two-axis external review")
@@ -35,7 +37,7 @@ def main():
     directory = Path(args.session).resolve()
     state_file = directory / "session.json"
     if args.command == "begin":
-        session = scope.begin(args.repo)
+        session = scope.begin(args.repo, baseline=args.baseline, paths=args.paths)
         session["author"] = providers.author_context(args.author)
         session["reviewer_model"] = args.reviewer_model
         if directory == Path(session["repo"]) or Path(session["repo"]) in directory.parents:
