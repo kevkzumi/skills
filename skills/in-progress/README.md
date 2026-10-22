@@ -10,6 +10,7 @@ npx skills@latest add mattpocock/skills --skill=<name>
 
 - **[loop-me](./loop-me/SKILL.md)**: Grill yourself into implementable workflow specs over multiple sessions, using the current directory as a stateful workspace. User-invoked.
 - **[implement-cross-review](./implement-cross-review/SKILL.md)**: Implement one piece of work with independent Standards and Spec reviews through the other coding tool. User-invoked; requires this complete fork checkout through a local link, not a copied skill folder.
+- **[implement-spec-cross-review](./implement-spec-cross-review/SKILL.md)**: Coordinate a spec's ready issues in isolated worktrees, then review the complete integration through the other coding tool before delivery. User-invoked; requires this complete fork checkout through a local link.
 - **[writing-beats](./writing-beats/SKILL.md)**: Shape an article as a journey of beats, choose-your-own-adventure style. Pick a starting beat, write only that beat, then pivot to the next, until the article reaches a natural end.
 - **[writing-fragments](./writing-fragments/SKILL.md)**: Grilling session that mines you for fragments (heterogeneous nuggets of writing) and appends them to a single document as raw material for a future article.
 - **[writing-shape](./writing-shape/SKILL.md)**: Take a markdown file of raw material and shape it into an article paragraph by paragraph, arguing format choices at each step.
