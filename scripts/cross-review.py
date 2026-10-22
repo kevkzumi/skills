@@ -21,6 +21,7 @@ def main():
     begin = commands.add_parser("begin", help="Capture the baseline before editing")
     begin.add_argument("--repo", required=True)
     begin.add_argument("--author", choices=["codex", "claude"])
+    begin.add_argument("--reviewer-model", help="Requested model for the opposite reviewer tool")
     review = commands.add_parser("review", help="Run a frozen two-axis external review")
     sources = review.add_mutually_exclusive_group(required=True)
     sources.add_argument("--spec", help="File containing the resolved spec, including fetched issue text")
@@ -36,6 +37,7 @@ def main():
     if args.command == "begin":
         session = scope.begin(args.repo)
         session["author"] = providers.author_context(args.author)
+        session["reviewer_model"] = args.reviewer_model
         if directory == Path(session["repo"]) or Path(session["repo"]) in directory.parents:
             raise ValueError("Session artifacts must be outside the project.")
         directory.mkdir(parents=True, exist_ok=False)
