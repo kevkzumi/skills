@@ -18,7 +18,7 @@ You invoke this by typing `/ask-matt`; the agent won't reach for it on its own.
 
 ## Prerequisites
 
-The router names skills; it does not install them. Everything it points at has to be installed for the recommendation to be actionable. This fork also names its explicitly marked cross-review beta, which requires a local link to the complete fork checkout and is excluded from the promoted plugin.
+The router names skills; it does not install them. Everything it points at has to be installed for the recommendation to be actionable. This fork also names its explicitly marked cross-review betas, which require local links to the complete fork checkout and are excluded from the promoted plugin.
 
 The tracker-dependent routes (triage, `to-spec`, `to-tickets`, `implement`) assume [setup-matt-pocock-skills](https://aihero.dev/skills-setup-matt-pocock-skills) has already configured an issue tracker in the repo. The router recommends them even before that has happened.
 
@@ -70,7 +70,14 @@ No. Three separate proposals have asked for a router that reads your local `skil
 
 **Will the cross-review route change my existing implementation skill?**
 
-No. This fork's `implement-cross-review` beta is a separate single-work route that asks the other coding tool to review before the final commit. The ordinary [implement](https://aihero.dev/skills-implement) route keeps its existing behavior. The router names the beta only with its installation and supported-tool limitations; it does not install or invoke it for you.
+No. The fork offers two separate beta routes, both using the opposite coding tool for Standards and Spec review:
+
+| Scope | Route and completion gate |
+| --- | --- |
+| One piece of work | `implement-cross-review` reviews before the final implementation commit |
+| A parent spec and its issue graph | `implement-spec-cross-review` coordinates ready issues in separate worktrees and reviews the complete integration before PR readiness, tracker resolution, or reporting completion |
+
+The full-spec route requires its parent spec and permits intermediate implementation commits. The ordinary [implement](https://aihero.dev/skills-implement) and [implement-spec](https://aihero.dev/skills-implement-spec) routes keep their existing behavior. The router names the betas with their installation and supported-tool limitations; it does not install or invoke them for you.
 
 **It told me to edit a SKILL.md.**
 

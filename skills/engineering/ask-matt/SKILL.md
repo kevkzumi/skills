@@ -31,7 +31,12 @@ The route most work travels. You have an idea and want it built.
 
    When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
 
-   **Fork beta: `/implement-cross-review`** is the single-work alternative when you want the other coding tool to perform Standards and Spec reviews before the final commit. It currently supports Codex authors and Claude Code reviewers. It requires a local link to this complete fork checkout and is excluded from the promoted plugin. Read its `SKILL.md` for supported authoring contexts and completion gates before recommending it; the ordinary `/implement` flow remains available.
+   **Fork betas for independent external review**, both supporting Codex and Claude Code authors with the opposite tool as reviewer:
+
+   - **`/implement-cross-review`** for one piece of work: Standards and Spec review gate the final implementation commit.
+   - **`/implement-spec-cross-review`** for a parent spec and its issue graph: coordinate ready issues in separate worktrees, then review the complete integration before PR readiness, tracker resolution, or reporting completion. Intermediate implementation commits are allowed; the parent spec is required.
+
+   Both require a local link to this complete fork checkout and are excluded from the promoted plugin. Read the chosen `SKILL.md` for supported contexts and completion gates before recommending it. The ordinary `/implement` and `/implement-spec` flows remain available.
 
 4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
 

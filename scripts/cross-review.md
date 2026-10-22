@@ -62,6 +62,8 @@ For a single-work final commit, use the returned `scope.commit_paths` as exact a
 
 For spec coordination, intermediate implementation and merge commits are allowed. The shared outcome gates PR readiness, tracker resolution, and reporting the spec complete. A blocker preserves the draft PR, open work, integration branch, and recoverable unfinished work. The coordinator supplies the complete parent spec and issue requirements and reviews the full original integration range after all issues are merged.
 
+The `implement-spec-cross-review` launcher adds `--require-spec` at `begin`, persisting a policy that rejects a missing-parent-spec skip. Direct shared-helper callers can set the same flag. The coordinator owns dependency scheduling, integration status, validation, tracker actions, and safe cleanup; `allowed: true` alone does not establish that every required issue has been integrated. Prepare final commits before final review: a subsequent commit or merge invalidates the inspected revision and requires fresh review within the same budget.
+
 ## Verification
 
 Run `python3 -m unittest discover -s scripts/tests -v` from the fork checkout. Tests exercise complete handoffs with temporary Git repositories and stand-in CLIs, covering concurrent processes, capabilities, routing, scope, fix loops, skips, and blocked completion. Stand-ins validate launch configuration; they do not prove real CLI enforcement or authentication compatibility. Report live smoke results separately.

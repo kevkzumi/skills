@@ -36,6 +36,7 @@ def main():
     begin.add_argument("--path", dest="paths", action="append", help="Owned repository-relative file or directory; repeat as needed")
     begin.add_argument("--author", choices=["codex", "claude"])
     begin.add_argument("--reviewer-model", help="Requested model for the opposite reviewer tool")
+    begin.add_argument("--require-spec", action="store_true", help="Require the parent spec for a full-spec workflow")
     assess = commands.add_parser("assess", help="Record the author's resolution of every finding")
     assess.add_argument("--assessments", required=True, help="JSON list of axis/index/fixed-or-disagree/explanation objects")
     review = commands.add_parser("review", help="Run a frozen two-axis external review")
@@ -54,6 +55,7 @@ def main():
         session = scope.begin(args.repo, baseline=args.baseline, paths=args.paths)
         session["author"] = providers.author_context(args.author)
         session["reviewer_model"] = args.reviewer_model
+        session["require_spec"] = args.require_spec
         if directory == Path(session["repo"]) or Path(session["repo"]) in directory.parents:
             raise ValueError("Session artifacts must be outside the project.")
         directory.mkdir(parents=True, exist_ok=False)
@@ -68,6 +70,8 @@ def main():
         # Even invalid follow-up input must revoke a previous pass.
         prior = json.loads((directory / 'result.json').read_text()) if (directory / 'result.json').exists() else {}
         write(directory / 'result.json', dict(prior, allowed=False, error='Review is incomplete.'))
+        if session.get("require_spec") and not args.spec:
+            raise ValueError("Full-spec coordination requires its parent spec; Spec cannot be skipped.")
         if not 0 < args.timeout <= 3600:
             raise ValueError("Reviewer timeout must be positive and at most 3600 seconds.")
         spec = Path(args.spec).read_text() if args.spec else None
