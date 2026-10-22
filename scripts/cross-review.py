@@ -75,7 +75,8 @@ def main():
             raise ValueError("Spec source or confirmed skip reason is empty.")
         standards = [{"source": str(Path(path).resolve()), "contents": Path(path).read_text()}
                      for path in args.standards]
-        return rounds.review(session, directory, spec, standards, args.timeout, args.no_spec_reason)
+        return rounds.review(session, directory, spec, standards, args.timeout, args.no_spec_reason,
+                             spec_source=str(Path(args.spec).resolve()) if args.spec else None)
 
 
 if __name__ == "__main__":

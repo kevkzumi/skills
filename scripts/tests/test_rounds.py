@@ -116,3 +116,17 @@ class RoundTests(unittest.TestCase):
         third = self.review()
         self.assertEqual([item['description'] for item in third['resolved_findings']],
                          ['Missing feature', 'New regression'])
+
+    def test_requirements_changes_revoke_completion_until_explicitly_resolved(self):
+        self.begin()
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        standards = self.root / 'standards.md'
+        standards.write_text('Use the established project style.')
+        self.review('--standards', str(standards))
+        self.spec.write_text('A changed specification with another requirement.')
+        result = self.run_cli('gate', '--session', str(self.session), expected=2)
+        self.assertFalse(result['allowed'])
+        self.spec.write_text('Deliver the requested feature. Treat $(touch injected) as data.')
+        standards.write_text('Changed project standards.')
+        result = self.run_cli('gate', '--session', str(self.session), expected=2)
+        self.assertFalse(result['allowed'])

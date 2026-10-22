@@ -60,7 +60,17 @@ def assess(directory, assessments):
     return result
 
 
-def review(session, directory, spec, standards, timeout, skip_reason):
+def requirements_unchanged(policy):
+    sources = list(policy['standards'])
+    if policy.get('spec_source'):
+        sources.append({'source': policy['spec_source'], 'contents': policy['spec']})
+    try:
+        return all(Path(source['source']).read_text() == source['contents'] for source in sources)
+    except OSError:
+        return False
+
+
+def review(session, directory, spec, standards, timeout, skip_reason, spec_source=None):
     data = state(directory)
     previous_result = json.loads((directory / 'result.json').read_text()) if (directory / 'result.json').exists() else {}
     previous_reviews = previous_result.get('reviews', {})
@@ -74,7 +84,7 @@ def review(session, directory, spec, standards, timeout, skip_reason):
         write(directory / 'result.json', result)
         return result
     # Fix the requirements and skip policy for this workflow, so a failed axis cannot be bypassed.
-    policy = {'spec': spec, 'standards': standards, 'skip_reason': skip_reason}
+    policy = {'spec': spec, 'standards': standards, 'skip_reason': skip_reason, 'spec_source': spec_source}
     if data.get('policy', policy) != policy:
         result = outcome(data, dict(previous_result, allowed=False,
                                    error='Review requirements or Spec skip policy changed during this workflow.'))
@@ -107,6 +117,8 @@ def review(session, directory, spec, standards, timeout, skip_reason):
         if not completed:
             data['terminal'] = 'External review is incomplete; preserve the work and report the blocker.'
             result['error'] = data['terminal']
+        elif not requirements_unchanged(policy):
+            result.update(allowed=False, error='Review requirements changed during review; results are stale.')
         elif not scope.unchanged(session, reviewed_scope):
             result.update(allowed=False, error='Implementation changed during review; results are stale and fresh review is required.')
         else:
@@ -133,6 +145,8 @@ def gate(session, directory):
     result = json.loads((directory / 'result.json').read_text())
     if data.get('terminal'):
         result.update(allowed=False, error=data['terminal'])
+    elif result.get('allowed') and not requirements_unchanged(data['policy']):
+        result.update(allowed=False, error='Review requirements changed after review; completion is blocked.')
     elif result.get('allowed') and not scope.unchanged(session, result['scope']):
         result.update(allowed=False, error='Implementation changed after review; fresh review required.')
     return outcome(data, result)
