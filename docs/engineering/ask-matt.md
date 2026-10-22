@@ -18,7 +18,7 @@ You invoke this by typing `/ask-matt`; the agent won't reach for it on its own.
 
 ## Prerequisites
 
-The router names skills; it does not install them. Everything it points at has to be installed for the recommendation to be actionable, and it only knows the promoted skills in this repo.
+The router names skills; it does not install them. Everything it points at has to be installed for the recommendation to be actionable. This fork also names its explicitly marked cross-review beta, which requires a local link to the complete fork checkout and is excluded from the promoted plugin.
 
 The tracker-dependent routes (triage, `to-spec`, `to-tickets`, `implement`) assume [setup-matt-pocock-skills](https://aihero.dev/skills-setup-matt-pocock-skills) has already configured an issue tracker in the repo. The router recommends them even before that has happened.
 
@@ -67,6 +67,10 @@ It is a fair complaint. An open issue argues that most of the routing is determi
 **Can it route over my own skills, or another author's?**
 
 No. Three separate proposals have asked for a router that reads your local `skills/` directory and recommends from whatever is installed. `ask-matt` is not that. It is a map of one set, maintained by hand, and it knows nothing about skills you wrote or installed from elsewhere.
+
+**Will the cross-review route change my existing implementation skill?**
+
+No. This fork's `implement-cross-review` beta is a separate single-work route that asks the other coding tool to review before the final commit. The ordinary [implement](https://aihero.dev/skills-implement) route keeps its existing behavior. The router names the beta only with its installation and supported-tool limitations; it does not install or invoke it for you.
 
 **It told me to edit a SKILL.md.**
 
