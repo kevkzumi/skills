@@ -126,17 +126,23 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(status, self.git("status", "--porcelain"))
 
     def test_findings_and_incomplete_reviews_never_allow_completion(self):
-        self.begin()
-        (self.repo / "existing.txt").write_text("implementation\n")
         for mode in ("findings", "contradiction", "incomplete", "wrong-axis", "invalid-finding",
                      "empty", "authentication", "model-unavailable", "timeout"):
             with self.subTest(mode=mode):
+                (self.repo / "existing.txt").write_text("before\n")
+                self.session = self.root / ("review-" + mode)
+                self.begin()
+                (self.repo / "existing.txt").write_text("implementation\n")
                 self.env["REVIEW_MODE"] = mode
                 result = self.review("--timeout", "0.5", expected=2)
                 self.assertFalse(result["allowed"])
                 self.assertFalse(self.run_cli("gate", "--session", str(self.session), expected=2)["allowed"])
                 self.assertEqual((self.repo / "existing.txt").read_text(), "implementation\n")
         self.env.pop("REVIEW_MODE")
+        (self.repo / "existing.txt").write_text("before\n")
+        self.session = self.root / "review-missing-tool"
+        self.begin()
+        (self.repo / "existing.txt").write_text("implementation\n")
         (self.bin / "claude").unlink()
         # Ensure a real installed CLI is never called in this missing-tool test.
         self.env["PATH"] = str(self.bin)
