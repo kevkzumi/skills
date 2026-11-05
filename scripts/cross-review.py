@@ -41,6 +41,8 @@ def main():
     assess.add_argument("--assessments", required=True, help="JSON list of axis/index/fixed-or-disagree/explanation objects")
     resume = commands.add_parser("resume", help="Record explicit user authorization to resume after execution failure")
     resume.add_argument("--reason", required=True, help="User authorization and the repaired execution blocker")
+    resume.add_argument("--reconsider-disagreements", action="store_true",
+                        help="Explicit user authorization for fresh review of recorded disagreements")
     review = commands.add_parser("review", help="Run a frozen two-axis external review")
     sources = review.add_mutually_exclusive_group(required=True)
     sources.add_argument("--spec", help="File containing the resolved spec, including fetched issue text")
@@ -70,7 +72,7 @@ def main():
         if args.command == "assess":
             return rounds.assess(directory, json.loads(Path(args.assessments).read_text()))
         if args.command == "resume":
-            return rounds.resume(directory, args.reason)
+            return rounds.resume(directory, args.reason, args.reconsider_disagreements)
         # Even invalid follow-up input must revoke a previous pass.
         prior = json.loads((directory / 'result.json').read_text()) if (directory / 'result.json').exists() else {}
         write(directory / 'result.json', dict(prior, allowed=False, error='Review is incomplete.'))

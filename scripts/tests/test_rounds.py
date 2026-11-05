@@ -165,6 +165,58 @@ class RoundTests(unittest.TestCase):
         self.assertEqual(capture['prompt']['previous_review']['findings'][0]['description'], 'Missing feature')
         self.assertEqual(len(result['resolved_findings']), 1)
 
+    def test_explicit_reconsideration_preserves_disagreement_until_fresh_review(self):
+        self.begin()
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        self.env['REVIEW_MODE'] = 'findings'
+        self.review(expected=2)
+        disputed = self.assess_finding('disagree')
+        process = (self.log / 'spec.started').read_text()
+        self.run_cli('resume', '--session', str(self.session), '--reason',
+                     'Resume without reconsideration authorization', expected=2)
+        resumed = self.run_cli('resume', '--session', str(self.session),
+                               '--reconsider-disagreements', '--reason',
+                               'User explicitly asked to resolve the disagreements and continue review rounds.', expected=2)
+        self.assertTrue(resumed['resumed'])
+        self.assertFalse(resumed['allowed'])
+        self.assertEqual(resumed['disagreements'], disputed['disagreements'])
+        self.assertEqual(resumed['remaining_findings'], disputed['remaining_findings'])
+        self.assertEqual(process, (self.log / 'spec.started').read_text())
+        self.assertFalse(self.run_cli('gate', '--session', str(self.session), expected=2)['allowed'])
+        data = json.loads((self.session / 'rounds.json').read_text())
+        self.assertEqual(data['resumptions'][-1]['assessments'], disputed['disagreements'])
+        # A reviewer retaining the finding keeps delivery blocked.
+        retained = self.review(expected=2)
+        self.assertEqual(retained['rounds_started'], 2)
+        self.assertEqual(len(retained['remaining_findings']), 1)
+        capture = json.loads((self.log / 'spec.json').read_text())
+        self.assertEqual(capture['prompt']['previous_review']['author_assessments'][0]['resolution'], 'disagree')
+        self.assess_finding('disagree')
+        self.run_cli('resume', '--session', str(self.session), '--reconsider-disagreements',
+                     '--reason', 'User authorized another reconsideration within remaining budget.', expected=2)
+        self.env.pop('REVIEW_MODE')
+        cleared = self.review()
+        self.assertEqual(cleared['rounds_started'], 3)
+        self.assertEqual(len(cleared['resolved_findings']), 1)
+        self.assertTrue(self.run_cli('gate', '--session', str(self.session))['allowed'])
+
+    def test_reconsideration_cannot_reset_exhausted_rounds(self):
+        self.begin()
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        self.env['REVIEW_MODE'] = 'findings'
+        for number in range(3):
+            self.review(expected=2)
+            self.assess_finding('disagree')
+            resumed = self.run_cli('resume', '--session', str(self.session),
+                                   '--reconsider-disagreements', '--reason',
+                                   'User requests reconsideration.', expected=2)
+            if number < 2:
+                self.assertTrue(resumed['resumed'])
+            else:
+                self.assertIn('exhausted', resumed['error'])
+        self.assertEqual(self.review(expected=2)['rounds_started'], 3)
+        self.assertFalse(self.run_cli('gate', '--session', str(self.session), expected=2)['allowed'])
+
     def test_spec_cannot_be_replaced_with_a_skip_after_findings(self):
         self.begin()
         (self.repo / 'existing.txt').write_text('implementation\n')

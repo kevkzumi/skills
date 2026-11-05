@@ -56,7 +56,15 @@ After the user explicitly authorizes resuming a repaired execution failure, reco
 python3 <entrypoint> resume --session <directory> --reason "User authorization and repaired execution blocker"
 ```
 
-This records the reason, time, and prior blocker without launching reviewers. It preserves the original baseline, requirements, failed round, remaining findings, and three-round limit. Its exit status remains 2 because completion is still blocked. Run `review` separately using the unchanged requirements; assess retained findings first if requested. Resumption cannot clear disagreements or exhausted rounds. Another execution failure again requires stopping and reporting the blocker.
+This records the reason, time, and prior blocker without launching reviewers. It preserves the original baseline, requirements, failed round, remaining findings, and three-round limit. Its exit status remains 2 because completion is still blocked. Run `review` separately using the unchanged requirements; assess retained findings first if requested. Ordinary resumption cannot clear disagreement blockers. Another execution failure again requires stopping and reporting the blocker.
+
+If the user explicitly asks to continue review to resolve reported disagreements, first record honest `disagree` assessments with evidence. Then authorize reconsideration in the same session:
+
+```text
+python3 <entrypoint> resume --session <directory> --reconsider-disagreements --reason "User authorization to have reviewers reconsider the recorded evidence"
+```
+
+This preserves the assessments in the resumption audit and sends them to the next reviewers alongside the prior findings. It authorizes another review, not delivery: the gate remains blocked until fresh external review clears every finding. Do not relabel disagreements as fixed to continue. Neither form of resumption resets or extends the three-round limit.
 
 ## Gate completion
 

@@ -8,6 +8,7 @@ from . import runner, scope
 
 LIMIT = 3
 INCOMPLETE = 'External review is incomplete; preserve the work and report the blocker.'
+DISAGREEMENT = 'Unresolved author-reviewer disagreement; present it to the user.'
 
 
 def write(path, value):
@@ -45,19 +46,25 @@ def outcome(data, result):
                                if item['resolution'] == 'disagree'])
 
 
-def resume(directory, reason):
+def resume(directory, reason, reconsider_disagreements=False):
     data = state(directory)
     blocker = data.get('terminal', '')
     if not isinstance(reason, str) or not reason.strip():
         raise ValueError('Explicit user authorization and the repaired blocker must be recorded.')
     if len(data['history']) >= LIMIT:
         raise ValueError('Three review rounds exhausted; resumption cannot reset the limit.')
-    if (not data['history'] or data['history'][-1].get('completed')
-            or not (blocker == INCOMPLETE or blocker.startswith('Review could not complete: '))):
+    if reconsider_disagreements:
+        if (blocker != DISAGREEMENT or not data['history']
+                or not any(item['resolution'] == 'disagree' for item in data.get('assessments', []))):
+            raise ValueError('Reconsideration requires recorded disagreements and explicit user authorization.')
+    elif (not data['history'] or data['history'][-1].get('completed')
+          or not (blocker == INCOMPLETE or blocker.startswith('Review could not complete: '))):
         raise ValueError('Only a recorded execution failure can be resumed; disagreements remain blocked.')
     data.setdefault('resumptions', []).append({
         'authorized_at': datetime.now(timezone.utc).isoformat(),
         'reason': reason.strip(), 'after_round': len(data['history']), 'prior_blocker': blocker,
+        'reconsider_disagreements': reconsider_disagreements,
+        'assessments': data.get('assessments', []),
     })
     del data['terminal']
     result = json.loads((directory / 'result.json').read_text())
@@ -88,7 +95,7 @@ def assess(directory, assessments):
         raise ValueError('Assess every current finding exactly once; none may be silently dismissed.')
     data['assessments'] = assessments
     if any(item['resolution'] == 'disagree' for item in assessments):
-        data['terminal'] = 'Unresolved author-reviewer disagreement; present it to the user.'
+        data['terminal'] = DISAGREEMENT
     result.update(allowed=False, error=data.get('terminal', 'Author fixes need fresh external review.'))
     result = outcome(data, result)
     write(directory / 'rounds.json', data)
