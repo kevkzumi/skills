@@ -1,11 +1,13 @@
 """Persist the bounded review outcome independently of the author's completion action."""
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import runner, scope
 
 
 LIMIT = 3
+INCOMPLETE = 'External review is incomplete; preserve the work and report the blocker.'
 
 
 def write(path, value):
@@ -23,6 +25,17 @@ def findings(reviews):
             for index, finding in enumerate(report.get('findings', []))]
 
 
+def retained_reviews(data, result):
+    reviews = dict(result.get('reviews', {}))
+    for entry in reversed(data['history']):
+        for axis, report in entry.get('reviews', {}).items():
+            current = reviews.get(axis, {})
+            if (not (current.get('complete') or current.get('skipped'))
+                    and (report.get('complete') or report.get('skipped'))):
+                reviews[axis] = report
+    return reviews
+
+
 def outcome(data, result):
     return dict(result, rounds_started=len(data['history']),
                 rounds_completed=sum(item.get('completed', False) for item in data['history']),
@@ -32,10 +45,33 @@ def outcome(data, result):
                                if item['resolution'] == 'disagree'])
 
 
+def resume(directory, reason):
+    data = state(directory)
+    blocker = data.get('terminal', '')
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError('Explicit user authorization and the repaired blocker must be recorded.')
+    if len(data['history']) >= LIMIT:
+        raise ValueError('Three review rounds exhausted; resumption cannot reset the limit.')
+    if (not data['history'] or data['history'][-1].get('completed')
+            or not (blocker == INCOMPLETE or blocker.startswith('Review could not complete: '))):
+        raise ValueError('Only a recorded execution failure can be resumed; disagreements remain blocked.')
+    data.setdefault('resumptions', []).append({
+        'authorized_at': datetime.now(timezone.utc).isoformat(),
+        'reason': reason.strip(), 'after_round': len(data['history']), 'prior_blocker': blocker,
+    })
+    del data['terminal']
+    result = json.loads((directory / 'result.json').read_text())
+    result.update(allowed=False, error='User authorized resumption; fresh external review is required.')
+    result = outcome(data, result)
+    write(directory / 'rounds.json', data)
+    write(directory / 'result.json', result)
+    return dict(result, resumed=True)
+
+
 def assess(directory, assessments):
     data = state(directory)
     result = json.loads((directory / 'result.json').read_text())
-    current = findings(result.get('reviews', {}))
+    current = findings(retained_reviews(data, result))
     if not current or data.get('terminal'):
         raise ValueError('No findings are available for author assessment, or the workflow is blocked.')
     if not isinstance(assessments, list):
@@ -73,7 +109,7 @@ def requirements_unchanged(policy):
 def review(session, directory, spec, standards, timeout, skip_reason, spec_source=None):
     data = state(directory)
     previous_result = json.loads((directory / 'result.json').read_text()) if (directory / 'result.json').exists() else {}
-    previous_reviews = previous_result.get('reviews', {})
+    previous_reviews = retained_reviews(data, previous_result)
     blocker = data.get('terminal')
     if len(data['history']) >= LIMIT:
         blocker = blocker or 'Three review rounds exhausted; present remaining work to the user.'
@@ -115,7 +151,7 @@ def review(session, directory, spec, standards, timeout, skip_reason, spec_sourc
         result = {'allowed': bool(allowed), 'scope': reviewed_scope, 'reviews': reports,
                   'artifacts': str(round_dir)}
         if not completed:
-            data['terminal'] = 'External review is incomplete; preserve the work and report the blocker.'
+            data['terminal'] = INCOMPLETE
             result['error'] = data['terminal']
         elif not requirements_unchanged(policy):
             result.update(allowed=False, error='Review requirements changed during review; results are stale.')

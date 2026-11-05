@@ -10,8 +10,12 @@ import unittest
 
 ENTRY = Path(__file__).resolve().parents[1] / "cross-review.py"
 STAND_IN = r'''#!/usr/bin/env python3
-import json, os, pathlib, sys, time
-prompt = json.load(sys.stdin)
+import hashlib, json, os, pathlib, sys, time
+transport = sys.stdin.read()
+if len(transport.encode()) > 10 * 1024 * 1024:
+    print("piped stdin input exceeds 10MB", file=sys.stderr)
+    sys.exit(1)
+prompt = json.loads(transport)
 axis = prompt["axis"]
 log = pathlib.Path(os.environ["REVIEW_LOG"])
 (log / (axis + ".started")).write_text(str(os.getpid()))
@@ -23,6 +27,9 @@ if os.environ.get("EXPECT_PAIR") == "1":
         time.sleep(.02)
 (log / (axis + ".json")).write_text(json.dumps({
     "args": sys.argv[1:], "prompt": prompt, "cwd": os.getcwd(),
+    "stdin_bytes": len(transport.encode()),
+    "patch_sha256": hashlib.sha256(pathlib.Path(prompt["scope"]["diff_file"]).read_bytes()).hexdigest()
+        if "diff_file" in prompt["scope"] else None,
     "files": {p.name: p.read_text() for p in pathlib.Path("source").glob("*.txt")},
 }))
 mode = os.environ.get("REVIEW_MODE")
@@ -124,6 +131,26 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(result["reviews"]["spec"]["resolved_models"], ["stand-in-model"])
         self.assertTrue(self.run_cli("gate", "--session", str(self.session))["allowed"])
         self.assertEqual(status, self.git("status", "--porcelain"))
+
+    def test_large_implementation_is_reviewable_without_piping_the_patch(self):
+        import hashlib
+
+        self.begin()
+        contents = "first evidence line\n" + ("recorded evidence " * 8 + "\n") * 80000 + "last evidence line\n"
+        (self.repo / "large-evidence.md").write_text(contents)
+        result = self.review()
+        patch = (Path(result["artifacts"]) / "implementation.patch").read_bytes()
+        self.assertGreater(len(patch), 10 * 1024 * 1024)
+        self.assertEqual(patch.decode(), result["scope"]["diff"])
+        self.assertIn("+first evidence line", patch.decode())
+        self.assertIn("+last evidence line", patch.decode())
+        self.assertEqual((Path(result["artifacts"]) / "source/large-evidence.md").read_text(), contents)
+        for axis in ("standards", "spec"):
+            capture = json.loads((self.log / (axis + ".json")).read_text())
+            self.assertLess(capture["stdin_bytes"], 100000)
+            self.assertNotIn("diff", capture["prompt"]["scope"])
+            self.assertEqual(capture["patch_sha256"], hashlib.sha256(patch).hexdigest())
+        self.assertTrue(self.run_cli("gate", "--session", str(self.session))["allowed"])
 
     def test_findings_and_incomplete_reviews_never_allow_completion(self):
         for mode in ("findings", "contradiction", "incomplete", "wrong-axis", "invalid-finding",

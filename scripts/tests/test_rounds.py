@@ -11,6 +11,59 @@ class RoundTests(unittest.TestCase):
     review = fixture.HandoffTests.review
     begin = fixture.HandoffTests.begin
 
+    def test_explicit_resume_keeps_failed_round_and_requires_fresh_review(self):
+        self.begin()
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        self.env['REVIEW_MODE'] = 'authentication'
+        failed = self.review(expected=2)
+        self.assertEqual(failed['rounds_started'], 1)
+        session_before = (self.session / 'session.json').read_bytes()
+        history_before = json.loads((self.session / 'rounds.json').read_text())
+        self.env.pop('REVIEW_MODE')
+        self.assertEqual(self.review(expected=2)['rounds_started'], 1)
+        resumed = self.run_cli('resume', '--session', str(self.session), '--reason',
+                               'User requested resume after the reviewer authentication was repaired.', expected=2)
+        self.assertTrue(resumed['resumed'])
+        self.assertFalse(resumed['allowed'])
+        self.assertEqual(resumed['rounds_started'], 1)
+        self.assertEqual((self.session / 'session.json').read_bytes(), session_before)
+        state = json.loads((self.session / 'rounds.json').read_text())
+        self.assertEqual(state['history'], history_before['history'])
+        self.assertEqual(state['policy'], history_before['policy'])
+        self.assertEqual(state['resumptions'][0]['after_round'], 1)
+        self.assertEqual(state['resumptions'][0]['prior_blocker'], history_before['terminal'])
+        self.assertTrue(state['resumptions'][0]['authorized_at'])
+        self.assertIn('User requested', state['resumptions'][0]['reason'])
+        self.assertFalse(self.run_cli('gate', '--session', str(self.session), expected=2)['allowed'])
+        result = self.review()
+        self.assertEqual(result['rounds_started'], 2)
+        self.assertEqual(result['rounds_completed'], 1)
+        self.assertTrue(self.run_cli('gate', '--session', str(self.session))['allowed'])
+
+    def test_resume_requires_recorded_failure_and_cannot_reset_round_limit(self):
+        self.begin()
+        rejected = self.run_cli('resume', '--session', str(self.session), '--reason',
+                                'User requested resume.', expected=2)
+        self.assertIn('Only a recorded execution failure', rejected['error'])
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        self.env['REVIEW_MODE'] = 'authentication'
+        for number in range(1, 4):
+            self.assertEqual(self.review(expected=2)['rounds_started'], number)
+            process = (self.log / 'spec.started').read_text()
+            if number == 1:
+                state_before = (self.session / 'rounds.json').read_bytes()
+                self.run_cli('resume', '--session', str(self.session), '--reason', ' ', expected=2)
+                self.assertEqual((self.session / 'rounds.json').read_bytes(), state_before)
+            result = self.run_cli('resume', '--session', str(self.session), '--reason',
+                                  'User requested another attempt after repair.', expected=2)
+            self.assertEqual((self.log / 'spec.started').read_text(), process)
+            if number < 3:
+                self.assertTrue(result['resumed'])
+            else:
+                self.assertIn('Three review rounds exhausted', result['error'])
+                self.assertEqual(self.review(expected=2)['rounds_started'], 3)
+                self.assertEqual((self.log / 'spec.started').read_text(), process)
+
     def test_fixes_get_fresh_review_and_preserve_prior_findings(self):
         self.begin()
         (self.repo / 'existing.txt').write_text('first implementation\n')
@@ -65,6 +118,11 @@ class RoundTests(unittest.TestCase):
         self.assertEqual(result['rounds_started'], 1)
         result = self.assess_finding('disagree')
         self.assertEqual(len(result['disagreements']), 1)
+        before = (self.session / 'rounds.json').read_bytes()
+        rejected = self.run_cli('resume', '--session', str(self.session), '--reason',
+                                'User requested resume.', expected=2)
+        self.assertIn('disagreements remain blocked', rejected['error'])
+        self.assertEqual((self.session / 'rounds.json').read_bytes(), before)
         self.assertEqual(self.review(expected=2)['rounds_started'], 1)
         self.assertFalse(self.run_cli('gate', '--session', str(self.session), expected=2)['allowed'])
 
@@ -84,6 +142,28 @@ class RoundTests(unittest.TestCase):
         self.assertFalse(self.review(expected=2)['allowed'])
         self.assertFalse(self.run_cli('gate', '--session', str(self.session), expected=2)['allowed'])
         self.assertEqual((self.repo / 'existing.txt').read_text(), 'author fix\n')
+
+    def test_resumption_keeps_prior_findings_for_assessment_and_review(self):
+        self.begin()
+        (self.repo / 'existing.txt').write_text('implementation\n')
+        self.env['REVIEW_MODE'] = 'findings'
+        self.review(expected=2)
+        self.assess_finding()
+        (self.repo / 'existing.txt').write_text('author fix\n')
+        self.env['REVIEW_MODE'] = 'authentication'
+        failed = self.review(expected=2)
+        self.env.pop('REVIEW_MODE')
+        resumed = self.run_cli('resume', '--session', str(self.session), '--reason',
+                               'User authorized resuming the repaired reviewer.', expected=2)
+        self.assertEqual(resumed['remaining_findings'], failed['remaining_findings'])
+        self.assertEqual(self.review(expected=2)['rounds_started'], 2)
+        self.assess_finding()
+        result = self.review()
+        self.assertEqual(result['rounds_started'], 3)
+        self.assertEqual(result['rounds_completed'], 2)
+        capture = json.loads((self.log / 'spec.json').read_text())
+        self.assertEqual(capture['prompt']['previous_review']['findings'][0]['description'], 'Missing feature')
+        self.assertEqual(len(result['resolved_findings']), 1)
 
     def test_spec_cannot_be_replaced_with_a_skip_after_findings(self):
         self.begin()

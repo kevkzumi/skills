@@ -50,6 +50,14 @@ When every finding is fixed, repeat `review` with the same spec and standards. E
 
 Results expose rounds started and completed, resolved and remaining findings, disagreements, separate reports, and blockers. Use these in the end-of-run report. A failed axis cannot clear its previous findings. After three rounds, unresolved findings block completion and must be presented to the user. The helper serializes commands for a session; after an interrupted process, inspect the session and confirm no process is running before removing a stale lock. Preserve incomplete review as blocked.
 
+After the user explicitly authorizes resuming a repaired execution failure, record that authorization in the same session:
+
+```text
+python3 <entrypoint> resume --session <directory> --reason "User authorization and repaired execution blocker"
+```
+
+This records the reason, time, and prior blocker without launching reviewers. It preserves the original baseline, requirements, failed round, remaining findings, and three-round limit. Its exit status remains 2 because completion is still blocked. Run `review` separately using the unchanged requirements; assess retained findings first if requested. Resumption cannot clear disagreements or exhausted rounds. Another execution failure again requires stopping and reporting the blocker.
+
 ## Gate completion
 
 ```text

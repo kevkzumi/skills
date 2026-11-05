@@ -39,6 +39,8 @@ def main():
     begin.add_argument("--require-spec", action="store_true", help="Require the parent spec for a full-spec workflow")
     assess = commands.add_parser("assess", help="Record the author's resolution of every finding")
     assess.add_argument("--assessments", required=True, help="JSON list of axis/index/fixed-or-disagree/explanation objects")
+    resume = commands.add_parser("resume", help="Record explicit user authorization to resume after execution failure")
+    resume.add_argument("--reason", required=True, help="User authorization and the repaired execution blocker")
     review = commands.add_parser("review", help="Run a frozen two-axis external review")
     sources = review.add_mutually_exclusive_group(required=True)
     sources.add_argument("--spec", help="File containing the resolved spec, including fetched issue text")
@@ -46,7 +48,7 @@ def main():
     review.add_argument("--standards", action="append", default=[], help="Repeat for every relevant standards source")
     review.add_argument("--timeout", type=float, default=600, help="Seconds per reviewer (default: 600)")
     gate = commands.add_parser("gate", help="Revalidate review before the author completes work")
-    for subcommand in (begin, review, gate, assess):
+    for subcommand in (begin, review, gate, assess, resume):
         subcommand.add_argument("--session", required=True, help="Dedicated artifact directory outside the project")
     args = parser.parse_args()
     directory = Path(args.session).resolve()
@@ -67,6 +69,8 @@ def main():
             return rounds.gate(session, directory)
         if args.command == "assess":
             return rounds.assess(directory, json.loads(Path(args.assessments).read_text()))
+        if args.command == "resume":
+            return rounds.resume(directory, args.reason)
         # Even invalid follow-up input must revoke a previous pass.
         prior = json.loads((directory / 'result.json').read_text()) if (directory / 'result.json').exists() else {}
         write(directory / 'result.json', dict(prior, allowed=False, error='Review is incomplete.'))
