@@ -28,6 +28,14 @@ Every skill that dispatches a subagent says to start it with a fresh context win
 
 ## Agent skills
 
+### Issue tracker
+
+Use GitHub Issues in `kevkzumi/skills`. Before reading or publishing issues, read `docs/agents/issue-tracker.md` for commands and conventions.
+
 ### Triage labels
 
 Canonical names, unchanged. See `docs/agents/triage-labels.md`. Issues are judged against [`SCOPE.md`](./SCOPE.md).
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `.agents/adr/`. Before exploring the codebase, read `docs/agents/domain.md` for the domain documentation rules.
