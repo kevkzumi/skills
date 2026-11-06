@@ -1,0 +1,5 @@
+interface:
+  display_name: "Implement Spec Cross Review"
+  short_description: "Build a full spec, then independently review integration"
+policy:
+  allow_implicit_invocation: false

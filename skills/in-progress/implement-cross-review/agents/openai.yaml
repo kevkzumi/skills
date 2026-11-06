@@ -1,0 +1,5 @@
+interface:
+  display_name: "Implement Cross Review"
+  short_description: "Implement with independent reviews from the other tool"
+policy:
+  allow_implicit_invocation: false
